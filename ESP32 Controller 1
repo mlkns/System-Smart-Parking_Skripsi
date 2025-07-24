@@ -1,0 +1,271 @@
+#include <SPI.h>
+#include <MFRC522.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ESP32Servo.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// --- RFID ---
+#define RST_PIN_MASUK 4
+#define SS_PIN_MASUK 2
+#define RST_PIN_KELUAR 15
+#define SS_PIN_KELUAR 5
+
+MFRC522 rfidMasuk(SS_PIN_MASUK, RST_PIN_MASUK);
+MFRC522 rfidKeluar(SS_PIN_KELUAR, RST_PIN_KELUAR);
+
+// --- WiFi ---
+const char* ssid = "mlkns";
+const char* password = "123456788";
+const String host = "http://192.168.150.197:5000";
+
+// --- Waktu ---
+unsigned long lastReadMasuk = 0;
+unsigned long lastReadKeluar = 0;
+const unsigned long debounceDelay = 3000;
+
+
+// --- Servo & IR ---
+Servo servoMasuk, servoKeluar;
+#define SERVO_MASUK_PIN 25
+#define SERVO_KELUAR_PIN 33
+#define IR_MASUK_PIN 26
+#define IR_KELUAR_PIN 27
+
+// --- Tombol ---
+#define BUTTON_BANTUAN_PIN 32
+bool tombolBantuanDitekan = false;
+
+// --- LCD I2C ---
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// --- Variabel Kontrol ---
+String waitingUID = "";
+bool menungguKonfirmasi = false;
+
+void setup() {
+  Serial.begin(115200);
+  SPI.begin();
+  rfidMasuk.PCD_Init();
+  rfidKeluar.PCD_Init();
+
+  // WiFi
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected: " + WiFi.localIP().toString());
+
+  // Servo & IR & Tombol
+  servoMasuk.attach(SERVO_MASUK_PIN);
+  servoKeluar.attach(SERVO_KELUAR_PIN);
+  pinMode(IR_MASUK_PIN, INPUT);
+  pinMode(IR_KELUAR_PIN, INPUT);
+  pinMode(BUTTON_BANTUAN_PIN, INPUT_PULLUP);
+
+  servoMasuk.write(90);  // Palang tutup awal
+  servoKeluar.write(90);
+
+  // LCD Init
+  lcd.begin();
+  lcd.backlight();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Silahkan Tap");
+  lcd.setCursor(0, 1);
+  lcd.print("Kartu Anda");
+}
+
+void loop() {
+  unsigned long now = millis();
+
+  // === RFID Masuk ===
+  if (rfidMasuk.PICC_IsNewCardPresent() && rfidMasuk.PICC_ReadCardSerial()) {
+    if (now - lastReadMasuk > debounceDelay) {
+      String uid = getUID(rfidMasuk);
+      Serial.println("[MASUK] UID: " + uid);
+      kirimAutoEntry(uid);
+
+      lastReadMasuk = now;
+    }
+  }
+
+  // === RFID Keluar ===
+  if (!menungguKonfirmasi && rfidKeluar.PICC_IsNewCardPresent() && rfidKeluar.PICC_ReadCardSerial()) {
+    if (now - lastReadKeluar > debounceDelay) {
+      waitingUID = getUID(rfidKeluar);
+      menungguKonfirmasi = true;
+      Serial.println("[KELUAR] UID Terdeteksi: " + waitingUID);
+      kirimGetInfo(waitingUID);
+      lastReadKeluar = now;
+    }
+  }
+
+  // === Cek Konfirmasi Keluar ===
+  if (menungguKonfirmasi && (millis() - lastReadKeluar > 1000)) {
+    if (cekKonfirmasi(waitingUID)) {
+      Serial.println("Konfirmasi diterima, membuka palang keluar");
+      bukaPalang(servoKeluar, IR_KELUAR_PIN);
+      menungguKonfirmasi = false;
+      waitingUID = "";
+    }
+  }
+
+  // === Tombol Manual Bantuan ===
+  if (digitalRead(BUTTON_BANTUAN_PIN) == LOW && !tombolBantuanDitekan) {
+    tombolBantuanDitekan = true;
+    Serial.println("Tombol bantuan ditekan!");
+    tampilLCD("Bantuan Diterima", "Silahkan Tunggu");
+
+    if (WiFi.status() == WL_CONNECTED) {
+      HTTPClient http;
+      http.begin(host + "/bantuan");
+      http.addHeader("Content-Type", "application/json");
+      int code = http.POST("{\"status\":\"minta_bantuan\"}");
+      if (code > 0) Serial.println("Bantuan dikirim ke server");
+      http.end();
+    }
+
+    delay(1000);  // Anti bouncing
+  } else if (digitalRead(BUTTON_BANTUAN_PIN) == HIGH) {
+    tombolBantuanDitekan = false;
+  }
+}
+
+// === Fungsi Tambahan ===
+
+String getUID(MFRC522& rfid) {
+  String uid = "";
+  for (byte i = 0; i < rfid.uid.size; i++) {
+    if (rfid.uid.uidByte[i] < 0x10) uid += "0";
+    uid += String(rfid.uid.uidByte[i], HEX);
+  }
+  rfid.PICC_HaltA();
+  rfid.PCD_StopCrypto1();
+  uid.toUpperCase();
+  return uid;
+}
+
+void kirimAutoEntry(String uid) {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(host + "/auto_entry");
+    http.addHeader("Content-Type", "application/json");
+    int httpCode = http.POST("{\"rfid\":\"" + uid + "\"}");
+
+    if (httpCode > 0) {
+      String payload = http.getString();
+      Serial.println("AutoEntry Response: " + payload);
+
+      if (httpCode == 503 && payload.indexOf("Slot parkir penuh") != -1) {
+        tampilLCD("Slot Penuh", "Silahkan Tunggu");
+        delay(3000);
+        tampilLCD("Silahkan Tap", "Kartu Anda");
+        servoMasuk.write(90);
+        return;
+      }
+
+      if (httpCode == 409 && payload.indexOf("Kendaraan masih terparkir") != -1) {
+        tampilLCD("Kendaraan Sudah", "Terparkir");
+        delay(3000);
+        tampilLCD("Silahkan Tap", "Kartu Anda");
+        servoMasuk.write(90);
+        return;
+      }
+
+      // === Ambil slot dari response JSON ===
+      int slotIndex = payload.indexOf("\"slot\":\"");
+      if (slotIndex != -1) {
+        int start = slotIndex + 8;
+        int end = payload.indexOf("\"", start);
+        String slot = payload.substring(start, end);
+        Serial.println("Slot Diterima: " + slot);
+        tampilLCD("Slot Anda:", slot);
+        delay(3000);
+        tampilLCD("Silahkan Tap", "Kartu Anda");
+
+        // === PALANG DIBUKA HANYA JIKA SLOT ADA ===
+        bukaPalang(servoMasuk, IR_MASUK_PIN);
+      } else {
+        tampilLCD("Gagal Ambil Slot", "Coba Lagi");
+        servoMasuk.write(90);
+      }
+
+    } else {
+      Serial.println("AutoEntry Error: " + String(httpCode));
+      tampilLCD("Kendaraan Sudah", "Terparkir");
+      servoMasuk.write(90);
+    }
+
+    http.end();
+  }
+}
+
+
+void kirimGetInfo(String uid) {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(host + "/get_info?rfid=" + uid);
+    int httpCode = http.GET();
+    if (httpCode > 0) Serial.println("GetInfo: " + http.getString());
+    else Serial.println("GetInfo Error: " + String(httpCode));
+    http.end();
+  }
+}
+
+bool cekKonfirmasi(String uid) {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(host + "/cek_keluar/" + uid);
+    int httpCode = http.GET();
+    if (httpCode > 0) {
+      String payload = http.getString();
+      Serial.println("CekKonfirmasi: " + payload);
+      http.end();
+      return payload.indexOf("true") != -1;
+    } else {
+      Serial.println("CekKonfirmasi Error: " + String(httpCode));
+    }
+    http.end();
+  }
+  return false;
+}
+
+void bukaPalang(Servo& servo, int irPin) {
+  // Gerak pelan dari 90 ke 0 derajat
+  for (int pos = 90; pos >= 0; pos -= 2) {  // Turun 2 derajat tiap langkah
+    servo.write(pos);
+    delay(20);  // Delay antar langkah, makin besar delay makin pelan
+  }
+
+  Serial.println("Palang dibuka");
+  unsigned long start = millis();
+  while (millis() - start < 10000) {
+    if (digitalRead(irPin) == LOW) {
+      Serial.println("Kendaraan terdeteksi");
+      while (digitalRead(irPin) == LOW)
+        ;  // Tunggu kendaraan lewat
+      break;
+    }
+    delay(100);
+  }
+
+  // Gerak pelan tutup palang dari 0 ke 90 derajat
+  for (int pos = 0; pos <= 90; pos += 2) {
+    servo.write(pos);
+    delay(20);
+  }
+  Serial.println("Palang ditutup");
+  delay(1000);
+}
+
+void tampilLCD(String baris1, String baris2) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(baris1);
+  lcd.setCursor(0, 1);
+  lcd.print(baris2);
+}
