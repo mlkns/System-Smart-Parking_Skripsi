@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard Parkir</title>
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+  <!-- Header -->
+  <nav class="navbar navbar-expand-lg shadow-sm mb-4"
+    style="background: linear-gradient(135deg, #8e44ad, #e84393); font-family: 'Montserrat', sans-serif;">
+    <div class="container-fluid d-flex justify-content-between align-items-center py-2">
+      <a class="navbar-brand fw-bold fs-4 text-white" href="#" style="letter-spacing: 1px;">Dashboard</a>
+
+      <div class="d-flex align-items-center gap-3">
+        <!-- Profile Button -->
+        <button class="btn btn-outline-light d-flex align-items-center gap-2 px-3 py-1 rounded-pill" type="button"
+          style="transition: 0.3s;">
+          <i class="bi bi-person-check fs-5"></i>
+          <span>Admin</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+
+  <div>
+    <!-- Summary Cards -->
+    <div class="row text-center mb-4">
+      <div class="col-md-4 mb-3">
+        <div class="card text-white shadow p-4 border-0"
+          style="background: linear-gradient(135deg, #8e44ad, #e84393); border-radius: 1rem;">
+          <i class="bi bi-person text-white fs-1 mb-2 opacity-75"></i>
+          <h2 class="fw-bold ">{{ slot_terisi }}</h2>
+          <p class="mb-0 fw-bold text-white">Jumlah Kendaraan Terparkir</p>
+        </div>
+      </div>
+      <div class="col-md-4 mb-3">
+        <div class="card text-white shadow p-4 border-0"
+          style="background: linear-gradient(135deg, #6c5ce7, #fd79a8); border-radius: 1rem;">
+          <i class="bi bi-person-check text-white mb-2 opacity-75"></i>
+          <h2 class="fw-bold">{{ slot_kosong }}</h2>
+          <p class="mb-0 fw-bold text-white">Tempat Kosong Tersedia</p>
+        </div>
+      </div>
+      <div class="col-md-4 mb-3">
+        <div class="card text-white shadow p-4 border-0"
+          style="background: linear-gradient(135deg, #a29bfe, #ff6bcb); border-radius: 1rem;">
+          <i class="bi bi-person-plus text-white fs-1 mb-2 opacity-75"></i>
+          <h2 class="fw-bold">{{ total_slot }}</h2>
+          <p class="mb-0 fw-bold text-white">Total Kapasitas Parkir</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="notifBantuan" class="alert alert-warning alert-dismissible fade show d-none shadow-sm" role="alert">
+    <div class="d-flex align-items-center">
+      <span class="me-2 fs-4">🚨</span>
+      <div>
+        <strong>Permintaan Bantuan!</strong> Silakan periksa lokasi parkir terkait.
+      </div>
+    </div>
+
+    <form class="mt-2"
+      onsubmit="fetch('/reset_bantuan', { method: 'POST' }).then(() => location.reload()); return false;">
+      <button type="submit" class="btn btn-success btn-sm">Tandai Bantuan Selesai</button>
+    </form>
+  </div>
+
+
+
+
+  </div>
+
+  <!-- Database & Peta Parkir -->
+  <div class="col-md-12 mb-4">
+    <div class="card p-3">
+    </div>
+    <!-- Database & Form -->
+
+    <div class="row">
+      <div class="col-md-6 mb-4">
+        <div class="card p-3">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5><i class="bi bi-database"></i> Database</h5>
+            <small id="currentDateTime"></small>
+          </div>
+          <form action="/admin" method="POST">
+            <div class="mb-3">
+              <label for="rfid" class="form-label">Plat Kendaraan</label>
+              <input type="text" class="form-control" id="rfid" name="rfid" placeholder=" Masukan Plat Kendaraan"
+                required>
+            </div>
+            <button id="btnInputMasuk" class="btn btn-outline-primary btn-sm">Input Masuk</button>
+          </form>
+
+          <!-- Form Input Keluar -->
+          <form id="exitForm" method="POST" onsubmit="return false;" class="mt-3">
+            <input type="text" name="rfid" id="rfidInput" class="form-control mb-2"
+              placeholder=" Masukan Plat Kendaraan" required>
+            <button type="button" onclick="cariDataKeluar()" class="btn btn-outline-danger btn-sm">Input
+              Keluar</button>
+          </form>
+
+          <!-- Modal Konfirmasi Keluar -->
+          <div id="infoModal"
+            style="display: none; position: fixed; top: 20%; left: 35%; width: 30%; background: white; border: 1px solid #ccc; padding: 20px; border-radius: 10px; box-shadow: 0px 0px 15px rgba(0,0,0,0.2); z-index: 999;">
+            <h4>Informasi Kendaraan</h4>
+            <p><strong>Slot:</strong> <span id="infoSlot"></span></p>
+            <p><strong>Waktu Masuk:</strong> <span id="infoMasuk"></span></p>
+            <p><strong>Waktu Keluar:</strong> <span id="infoKeluar"></span></p>
+            <p><strong>Tarif:</strong> Rp <span id="infoTarif"></span></p>
+            <form id="hapusForm">
+              <input type="hidden" name="rfid" id="hiddenId">
+              <button type="submit" class="btn btn-danger">Konfirmasi</button>
+            </form>
+          </div>
+
+          <!-- Tabel Parkir -->
+          <div class="table-responsive mt-3">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Slot Parkir</th>
+                  <th>UID</th>
+                  <th>Waktu Masuk</th>
+                </tr>
+              </thead>
+              <tbody id="table-body">
+                {% for parkir in data_parkir %}
+                <tr>
+                  <td>{{ parkir[0] }}</td>
+                  <td>{{ parkir[1] }}</td>
+                  <td>{{ parkir[2] }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+
+
+      <div class="col-md-6 mb-4">
+        <div class="card p-3">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5><i class="bi bi-map"></i> Peta Parkir</h5>
+            <small></small>
+          </div>
+
+          <div class="parking-layout">
+            <!-- Baris kiri -->
+            <div>
+              <div class="slot" id="slot1" style="top: 50px; left: 380px;">{% for slot in ['A1'] %}</div>
+              <div class="slot {% if slot in occupied_slots %}occupied{% endif %}" id="{{ slot }}"
+                style="top: 50px; left: 380px;">
+                {{ slot }}
+              </div>
+              {% endfor %}
+            </div>
+            <div>
+              <div class="slot" id="slot2" style="top: 100px; left: 380px;">{% for slot in ['A2'] %}</div>
+              <div class="slot {% if slot in occupied_slots %}occupied{% endif %}" id="{{ slot }}"
+                style="top: 100px; left: 380px;">
+                {{ slot }}
+              </div>
+              {% endfor %}
+            </div>
+            <div>
+              <div class="slot" id="slot3" style="top: 150px; left: 380px;">{% for slot in ['A3'] %}</div>
+              <div class="slot {% if slot in occupied_slots %}occupied{% endif %}" id="{{ slot }}"
+                style="top: 150px; left: 380px;">
+                {{ slot }}
+              </div>
+              {% endfor %}
+            </div>
+            <div>
+              <div class="slot" id="slot4" style="top: 205px; left: 380px;">{% for slot in ['A4'] %}</div>
+              <div class="slot {% if slot in occupied_slots %}occupied{% endif %}" id="{{ slot }}"
+                style="top: 205px; left: 380px;">
+                {{ slot }}
+              </div>
+              {% endfor %}
+            </div>
+            <div>
+              <div class="slot" id="slot5" style="top: 225px; left: 380px;">{% for slot in ['A5'] %}</div>
+              <div class="slot {% if slot in occupied_slots %}occupied{% endif %}" id="{{ slot }}"
+                style="top: 255px; left: 380px;">
+                {{ slot }}
+              </div>
+              {% endfor %}
+            </div>
+
+            <div>
+              <div class="slot" id="slot6" style="top: 308px; left: 380px;">{% for slot in ['A6'] %}</div>
+              <div class="slot {% if slot in occupied_slots %}occupied{% endif %}" id="{{ slot }}"
+                style="top: 308px; left: 380px;">
+                {{ slot }}
+              </div>
+              {% endfor %}
+            </div>
+
+            <!-- Baris kanan -->
+            <div>
+              <div class="slot" id="slot7" style="top: 50px; left: 85px;">{% for slot in ['B1'] %}</div>
+              <div class="slot {% if slot in occupied_slots %}occupied{% endif %}" id="{{ slot }}"
+                style="top: 50px; left: 85px;">
+                {{ slot }}
+              </div>
+              {% endfor %}
+            </div>
+            <div>
+              <div class="slot" id="slot8" style="top: 100px; left: 85px;">{% for slot in ['B2'] %}</div>
+              <div class="slot {% if slot in occupied_slots %}occupied{% endif %}" id="{{ slot }}"
+                style="top: 100px; left: 85px;">
+                {{ slot }}
+              </div>
+              {% endfor %}
+            </div>
+            <div>
+              <div class="slot" id="slot9" style="top: 150px; left: 85px;">{% for slot in ['B3'] %}</div>
+              <div class="slot {% if slot in occupied_slots %}occupied{% endif %}" id="{{ slot }}"
+                style="top: 150px; left: 85px;">
+                {{ slot }}
+              </div>
+              {% endfor %}
+            </div>
+            <div>
+              <div class="slot" id="slot7" style="top: 205px; left: 85px;">{% for slot in ['B4'] %}</div>
+              <div class="slot {% if slot in occupied_slots %}occupied{% endif %}" id="{{ slot }}"
+                style="top: 205px; left: 85px;">
+                {{ slot }}
+              </div>
+              {% endfor %}
+            </div>
+            <div>
+              <div class="slot" id="slot7" style="top: 255px; left: 85px;">{% for slot in ['B5'] %}</div>
+              <div class="slot {% if slot in occupied_slots %}occupied{% endif %}" id="{{ slot }}"
+                style="top: 255px; left: 85px;">
+                {{ slot }}
+              </div>
+              {% endfor %}
+            </div>
+            <div>
+              <div class="slot" id="slot7" style="top: 308px; left: 85px;">{% for slot in ['B6'] %}</div>
+              <div class="slot {% if slot in occupied_slots %}occupied{% endif %}" id="{{ slot }}"
+                style="top: 308px; left: 85px;">
+                {{ slot }}
+              </div>
+              {% endfor %}
+            </div>
+
+
+          </div>
+        </div>
+
+
+      </div>
+    </div>
+  </div>
+  </div>
+  </div>
+
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+  <script src="script.js"></script>
+</body>
+
+
+</html>
