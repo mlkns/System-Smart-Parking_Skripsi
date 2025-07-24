@@ -1,0 +1,335 @@
+/* Umum */
+body {
+  background-color: #f8f9fa;
+  font-family: 'Poppins', sans-serif;
+  padding: 20px;
+}
+
+.container {
+  position: relative;
+  width: 1200px;
+  margin: auto;
+  border: 2px solid black;
+  padding: 20px;
+}
+
+h1 {
+  text-align: center;
+}
+
+/* Header Navbar */
+.navbar {
+  background: linear-gradient(90deg, #0d6efd, #6610f2); /* Gradasi biru ke ungu */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  padding: 1rem 2rem;
+  border-radius: 10px;
+}
+
+.navbar .navbar-brand {
+  font-weight: 700;
+  font-size: 1.8rem;
+  color: #fff;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: color 0.3s ease;
+}
+
+.navbar .navbar-brand:hover {
+  color: #f8f9fa; /* Warna terang saat hover */
+}
+
+.navbar .d-flex {
+  font-weight: 500;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.navbar .d-flex i {
+  font-size: 1.5rem;
+  color: #fff;
+  transition: transform 0.3s ease;
+}
+
+.navbar .d-flex i:hover {
+  transform: scale(1.2); /* Efek membesar pada ikon saat hover */
+}
+
+/* Cards */
+.card {
+  border: none;
+  border-radius: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  text-align: center;
+  background: #ffffff;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+}
+
+.card h2 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.card p {
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+  color: #666;
+}
+
+.card i {
+  font-size: 2rem;
+  color: #0d6efd;
+}
+
+/* Section titles */
+h5 {
+  font-weight: 700;
+}
+
+/* Buttons */
+.btn {
+  border-radius: 30px;
+}
+
+.btn-outline-primary, .btn-outline-secondary, .btn-outline-danger {
+  padding: 5px 20px;
+  font-size: 0.9rem;
+}
+
+
+
+/* Table */
+.table {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.table thead {
+  background-color: #0d6efd;
+  color: #fff;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: #f2f2f2;
+}
+
+/* CSS untuk mengaktifkan scroll jika lebih dari 10 data */
+.table-container {
+  max-height: 300px; /* Sesuaikan dengan tinggi yang diinginkan */
+  overflow-y: auto; /* Menambahkan scroll vertikal */
+}
+
+
+/* Parking Map */
+.parking-map {
+  background-color: #ffffff;
+  border: 2px dashed #0d6efd;
+  border-radius: 1rem;
+  padding: 1rem;
+  min-height: 300px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Slot Parkir */
+.parking-lot {
+  display: grid;
+  grid-template-columns: repeat(8, 50px); /* 8 kolom untuk A dan B */
+  grid-gap: 5px;
+  justify-content: center;
+  margin-bottom: 30px;
+}
+
+.slot {
+  position: absolute;
+  width: 100px;
+  height: 40px;
+  border-radius: 6px;
+}
+
+.occupied {
+  background-image: url('/static/images/car.png'); ;
+}
+
+.parking-diagonal {
+  display: grid;
+  grid-template-columns: repeat(8, 50px); /* 8 kolom untuk C dan D, tanpa rotasi */
+  grid-gap: 5px;
+  justify-content: center;
+  margin-bottom: 30px;
+}
+
+
+.slot-diagonal {
+  width: 50px;
+  height: 70px; /* Tidak ada rotasi */
+  border: 1px solid black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: white;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.arrow {
+  width: 100%;
+  text-align: center;
+  margin: 20px 0;
+  font-size: 24px;
+}
+
+.vertical-arrows {
+  position: absolute;
+  left: 20px;
+  top: 200px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 24px;
+}
+
+/* Responsive spacing */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 1rem 1rem;
+  }
+
+  .navbar .navbar-brand {
+    font-size: 1.5rem;
+  }
+
+  .navbar .d-flex {
+    font-size: 1rem;
+  }
+
+  .card h2 {
+    font-size: 2rem;
+  }
+
+  .parking-lot, .parking-diagonal {
+    grid-template-columns: repeat(4, 50px); /* 4 kolom untuk tampilan kecil */
+  }
+}
+
+.slot-diagonal {
+  width: 50px;
+  height: 50px;
+  margin: 5px;
+  background-color: lightgray;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+
+#exitModal {
+  display: none;
+  position: fixed;
+  background: rgba(0, 0, 0, 0.5);
+  top: 0; left: 0; right: 0; bottom: 0;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+#exitModal > div {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  width: 320px;
+}
+
+.table-responsive {
+  max-height: 300px; /* Atur tinggi sesuai kebutuhan */
+  overflow-y: auto;
+}
+
+.slot.occupied, .slot-diagonal.occupied {
+  background-image: url('/static/images/car.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  border-color: transparent;
+  background-color: transparent;
+}
+
+.slot.occupied, .slot-diagonal.occupied {
+  background-image: url('/static/images/car.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  border-color: transparent;
+  background-color: transparent;
+}
+
+
+.parking-map {
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.occupied {
+  background-image: url('/static/images/car.png');;
+}
+
+.slot.occupied1, .slot-diagonal.occupied {
+  width: 30px;
+  height: 30px;
+  background-image: url('/static/images/car.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  border-color: transparent;
+  background-color: transparent;
+}
+
+.occupied1 {
+  width: 30px;
+  height: 30px;
+  background-image: url('/static/images/car.png');
+
+
+}
+.parking-layout {
+  position: relative;
+  width: 570px; /* sesuaikan dengan ukuran gambar */
+  height: 438px;
+  background-image: url('/static/images/Denah.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  margin: 20px auto;
+  border: 2px solid #ccc;
+}
+
+.parking-layout1 {
+  position: relative;
+  width: 290px; /* sesuaikan dengan ukuran gambar */
+  height: 220px;
+  background-image: url('/static/images/Denah.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  margin: 20px auto;
+  border: 2px solid #ccc;
+}
+
+
+
+.slot.filled {
+  background-image: url('/static/images/car.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  border-color: transparent;
+  background-color: transparent;
+}
