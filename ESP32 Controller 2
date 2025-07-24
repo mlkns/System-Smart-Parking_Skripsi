@@ -1,0 +1,129 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+// Ganti dengan kredensial WiFi dan alamat server Flask
+const char* ssid = "mlkns";
+const char* password = "123456788";
+const char* serverURL = "http://192.168.150.197:5000/occupied_slots"; // Sesuaikan IP
+
+// Ultrasonic slot A1
+#define TRIG_A1 5
+#define ECHO_A1 18
+
+// Ultrasonic slot A2
+#define TRIG_A2 4
+#define ECHO_A2 19
+
+// Ultrasonic slot A3
+#define TRIG_A3 22
+#define ECHO_A3 23
+
+// Buzzer masing-masing slot
+#define BUZZER_A1 13
+#define BUZZER_A2 14
+#define BUZZER_A3 27
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+
+  pinMode(BUZZER_A1, OUTPUT);
+  pinMode(BUZZER_A2, OUTPUT);
+  pinMode(BUZZER_A3, OUTPUT);
+
+  pinMode(TRIG_A1, OUTPUT); pinMode(ECHO_A1, INPUT);
+  pinMode(TRIG_A2, OUTPUT); pinMode(ECHO_A2, INPUT);
+  pinMode(TRIG_A3, OUTPUT); pinMode(ECHO_A3, INPUT);
+
+  digitalWrite(BUZZER_A1, LOW);
+  digitalWrite(BUZZER_A2, LOW);
+  digitalWrite(BUZZER_A3, LOW);
+
+  Serial.print("Menghubungkan ke WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nTerhubung ke WiFi.");
+}
+
+void loop() {
+  StaticJsonDocument<300> doc;
+  StaticJsonDocument<1> dummyDoc;  // Dokumen kosong untuk fallback
+  bool dataServerTersedia = false;
+
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverURL);
+    int httpCode = http.GET();
+
+    if (httpCode > 0) {
+      String payload = http.getString();
+      Serial.println("Data dari server: " + payload);
+      DeserializationError error = deserializeJson(doc, payload);
+
+      if (!error) {
+        dataServerTersedia = true;
+      } else {
+        Serial.println("Gagal parsing JSON.");
+      }
+    } else {
+      Serial.println("Gagal ambil data, kode: " + String(httpCode));
+    }
+
+    http.end();
+  } else {
+    Serial.println("WiFi tidak terhubung.");
+  }
+
+  JsonDocument* ref;
+  if (dataServerTersedia) {
+    ref = &doc;
+  } else {
+    ref = &dummyDoc;
+  }
+
+  // Cek semua slot
+  cekSlot("A1", readDistance(TRIG_A1, ECHO_A1), *ref, BUZZER_A1);
+  cekSlot("A2", readDistance(TRIG_A2, ECHO_A2), *ref, BUZZER_A2);
+  cekSlot("A3", readDistance(TRIG_A3, ECHO_A3), *ref, BUZZER_A3);
+
+  Serial.println("Selesai pengecekan semua slot.\n");
+
+  delay(5000);
+}
+
+float readDistance(int trigPin, int echoPin) {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  long duration = pulseIn(echoPin, HIGH);
+  float distance = duration * 0.034 / 2;
+  return distance;
+}
+
+void cekSlot(String namaSlot, float jarak, JsonDocument& doc, int pinBuzzer) {
+  Serial.println("Memeriksa slot: " + namaSlot);
+  Serial.print("Jarak ultrasonic slot " + namaSlot + ": ");
+  Serial.println(jarak);
+
+  bool slotHarusKosong = true;
+
+  for (JsonVariant v : doc.as<JsonArray>()) {
+    if (v.as<String>() == namaSlot) {
+      slotHarusKosong = false;
+      break;
+    }
+  }
+
+  if (jarak < 5.0 && slotHarusKosong) {
+    Serial.println("Objek terdeteksi di slot KOSONG -> BUZZER AKTIF");
+    digitalWrite(pinBuzzer, HIGH);
+  } else {
+    Serial.println("Tidak ada objek atau slot memang terisi -> BUZZER MATI");
+    digitalWrite(pinBuzzer, LOW);
+  }
+}
